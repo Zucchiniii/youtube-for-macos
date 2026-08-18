@@ -166,3 +166,4 @@ Two constraints worth knowing about, both discovered the hard way:
   bar, quality menu and captions that YouTube already does better.
 - Ad blocking is best-effort. YouTube changes its ad delivery often; the rules
   and selectors in `AdBlocker.swift` and `PageScript.swift` are where to adjust.
+
