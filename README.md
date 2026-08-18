@@ -7,7 +7,7 @@
 YouTube in a native macOS window, with SponsorBlock and an ad blocker built in.
 
 ```bash
-git clone https://github.com/<you>/youtube-for-macos.git
+git clone https://github.com/zucchiniii/youtube-for-macos.git
 cd youtube-for-macos
 ./build.sh run
 ```
