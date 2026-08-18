@@ -1,5 +1,5 @@
 #!/usr/bin/env swift
-// Draws the YouTube Plus app icon and writes an .iconset directory.
+// Draws the app icon and writes an .iconset directory.
 // Run:  swift Tools/MakeIcon.swift <output-iconset-directory>
 //
 // A play mark on a dark ground, with a plus badge in the upper right. The badge

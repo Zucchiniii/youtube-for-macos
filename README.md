@@ -1,14 +1,22 @@
 # YouTube Plus
 
+> **Unofficial.** A personal, third-party project. Not affiliated with,
+> authorised by, or endorsed by YouTube or Google, and not the official YouTube
+> application. "YouTube" is a trademark of Google LLC.
+
 YouTube in a native macOS window, with SponsorBlock and an ad blocker built in.
 
 ```bash
-cd ~/Documents/Claude\ projekt/skipper && ./build.sh run
+git clone https://github.com/<you>/youtube-for-macos.git
+cd youtube-for-macos
+./build.sh run
 ```
 
-That compiles, assembles `build/YouTube Plus.app`, draws the icon, ad-hoc signs it and
-launches. `./build.sh` builds without launching; drag `build/YouTube Plus.app` to
-`/Applications` to keep it. Requires macOS 14 or later.
+That compiles, assembles `build/YouTube Plus.app`, draws the icon, ad-hoc signs
+it and launches. `./build.sh` builds without launching; drag the app to
+`/Applications` to keep it.
+
+Requires macOS 14 or later and a Swift 6 toolchain (Xcode 16+). No dependencies.
 
 ---
 
@@ -94,8 +102,8 @@ SponsorBlock API, recording votes, the time-saved statistics, the compiled
 ad-blocking rules, and the window and menus.
 
 ```
-Sources/YouTubePlus/
-  App/YouTubePlusApp.swift    window, menus, shortcuts
+Sources/YouTubeForMac/
+  App/YouTube PlusApp.swift    window, menus, shortcuts
   Web/YouTubeView.swift       the web view, navigation policy, page↔Swift bridge
   Web/PageScript.swift        injected SponsorBlock + ad handling
   Web/BrowserState.swift      navigation state and commands

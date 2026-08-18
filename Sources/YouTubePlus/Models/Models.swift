@@ -71,7 +71,7 @@ enum Format {
 
 // MARK: - Errors
 
-enum YouTubePlusError: LocalizedError {
+enum AppError: LocalizedError {
     case network(String)
     case parsing(String)
 

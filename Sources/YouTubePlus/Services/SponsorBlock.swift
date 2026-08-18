@@ -59,14 +59,14 @@ actor SponsorBlockService {
                 URLQueryItem(name: "actionTypes", value: actionJSON),
             ]
         }
-        guard let url = components.url else { throw YouTubePlusError.network("Bad SponsorBlock server URL") }
+        guard let url = components.url else { throw AppError.network("Bad SponsorBlock server URL") }
 
         let (data, response) = try await session.data(from: url)
         guard let http = response as? HTTPURLResponse else { return [] }
         // 404 simply means "no submissions for this video".
         if http.statusCode == 404 { cache[videoID] = []; return [] }
         guard (200..<300).contains(http.statusCode) else {
-            throw YouTubePlusError.network("SponsorBlock returned HTTP \(http.statusCode)")
+            throw AppError.network("SponsorBlock returned HTTP \(http.statusCode)")
         }
 
         let raw: [[String: Any]]
@@ -126,7 +126,7 @@ actor SponsorBlockService {
         request.httpMethod = "POST"
         let (_, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw YouTubePlusError.network("Vote failed with HTTP \(http.statusCode)")
+            throw AppError.network("Vote failed with HTTP \(http.statusCode)")
         }
     }
 

@@ -240,7 +240,7 @@ struct GeneralSettings: View {
 
     private func export() {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "YouTube Plus Settings.json"
+        panel.nameFieldStringValue = "Settings.json"
         panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
