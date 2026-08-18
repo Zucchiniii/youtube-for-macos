@@ -6,6 +6,25 @@
 
 YouTube in a native macOS window, with SponsorBlock and an ad blocker built in.
 
+## Install
+
+Download `YouTube Plus.dmg` from
+[Releases](https://github.com/zucchiniii/youtube-for-macos/releases), open it and
+drag the app onto Applications.
+
+The first launch needs one extra step, because the app is signed ad hoc rather
+than with a paid Apple Developer ID: **right-click the app and choose Open**,
+then confirm. Only once — it opens normally afterwards. If macOS refuses
+outright, clear the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/YouTube Plus.app"
+```
+
+Requires macOS 14 or later.
+
+## Build it yourself
+
 ```bash
 git clone https://github.com/zucchiniii/youtube-for-macos.git
 cd youtube-for-macos
@@ -13,10 +32,15 @@ cd youtube-for-macos
 ```
 
 That compiles, assembles `build/YouTube Plus.app`, draws the icon, ad-hoc signs
-it and launches. `./build.sh` builds without launching; drag the app to
-`/Applications` to keep it.
+it and launches. `./build.sh` builds without launching.
 
-Requires macOS 14 or later and a Swift 6 toolchain (Xcode 16+). No dependencies.
+To produce the disk image:
+
+```bash
+./Tools/make-dmg.sh
+```
+
+Building needs a Swift 6 toolchain (Xcode 16+). No dependencies.
 
 ---
 
@@ -102,8 +126,8 @@ SponsorBlock API, recording votes, the time-saved statistics, the compiled
 ad-blocking rules, and the window and menus.
 
 ```
-Sources/YouTubeForMac/
-  App/YouTube PlusApp.swift    window, menus, shortcuts
+Sources/YouTubePlus/
+  App/YouTubePlusApp.swift    window, menus, shortcuts
   Web/YouTubeView.swift       the web view, navigation policy, page↔Swift bridge
   Web/PageScript.swift        injected SponsorBlock + ad handling
   Web/BrowserState.swift      navigation state and commands
@@ -112,6 +136,7 @@ Sources/YouTubeForMac/
   Storage/Settings.swift      preferences
   UI/Settings/                the settings window
 Tools/MakeIcon.swift          draws the app icon at build time
+Tools/make-dmg.sh             packages the app as a disk image
 ```
 
 ## Performance
