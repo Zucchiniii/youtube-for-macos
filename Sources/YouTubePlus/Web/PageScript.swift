@@ -101,6 +101,23 @@ enum PageScript {
         }
       }
 
+      // A global `var ytInitialPlayerResponse = {...}` in the page can replace the
+      // accessor installed below with a plain data property, in which case the
+      // setter never runs and a cold-loaded watch page keeps its ad placements —
+      // which is exactly the shape of "only the first video shows an ad".
+      // Sweeping the value directly catches that case whatever the cause.
+      function stripInitialGlobals() {
+        if (!options.blockAds) { return; }
+        ['ytInitialPlayerResponse', 'ytInitialData'].forEach(function (name) {
+          var value;
+          try { value = window[name]; } catch (e) { return; }
+          if (!value || typeof value !== 'object') { return; }
+          var carriesAds = AD_KEYS.some(function (k) { return k in value; });
+          if (!carriesAds) { return; }
+          stripAdFields(value);
+        });
+      }
+
       function installAdStripper() {
         var nativeParse = JSON.parse;
         JSON.parse = function (text, reviver) {
@@ -162,11 +179,7 @@ enum PageScript {
       var suppressed = {};
       var currentVideo = null;
       var segmentsLoaded = false;
-      var panelInserts = 0;
       var panelEl = null;
-      var panelError = '';
-      var sweepStep = 'none';
-      var sweepError = '';
       var noticeTimer = null;
 
       function player() { return document.getElementById('movie_player'); }
@@ -455,9 +468,8 @@ enum PageScript {
         try {
           spot.parent.insertBefore(panel, spot.before);
           panelEl = panel;
-          panelInserts++;
         } catch (e) {
-          panelError = String(e).slice(0, 60);
+          // Layout moved under us; the next sweep re-attaches.
         }
       }
 
@@ -470,27 +482,8 @@ enum PageScript {
         var p = player();
         var showingAd = !!(p && p.classList && p.classList.contains('ad-showing'));
 
-        var report = { type: 'state', playing: !v.paused && !v.ended,
-                       time: v.currentTime || 0, ad: showingAd };
-        if (window.__ytplusDebug) {
-          report.diag = {
-                 panel: !!document.querySelector('.ytplus-panel'),
-                 below: !!document.querySelector('#below'),
-                 segs: segments.length,
-                 loaded: segmentsLoaded,
-                 showPanel: !!options.showPanel,
-                 inserts: panelInserts,
-                 panelError: panelError,
-                 step: sweepStep,
-                 sweepError: sweepError,
-                 enabled: !!options.enabled,
-            video: currentVideo,
-            ad: showingAd,
-            adJumps: adJumps,
-            rate: v.playbackRate
-          };
-        }
-        post(report);
+        post({ type: 'state', playing: !v.paused && !v.ended,
+               time: v.currentTime || 0, ad: showingAd });
 
         if (showingAd || !options.enabled) { return; }
 
@@ -584,6 +577,7 @@ enum PageScript {
         var p = player();
         var v = media();
         var showingAd = !!(p && p.classList && p.classList.contains('ad-showing'));
+
 
         if (!showingAd) {
           // Ad over: put playback back the way the user had it.
@@ -751,16 +745,16 @@ enum PageScript {
         pending = true;
         setTimeout(function () {
           pending = false;
-          sweepStep = 'start';
           try {
-            checkVideoChanged(); sweepStep = 'video';
-            wireVideo(); sweepStep = 'wire';
-            handleAds(); sweepStep = 'ads';
-            applyQuality(); sweepStep = 'quality';
-            dismissPromos(); sweepStep = 'promos';
-            drawMarks(); sweepStep = 'marks';
+            stripInitialGlobals();
+            checkVideoChanged();
+            wireVideo();
+            handleAds();
+            applyQuality();
+            dismissPromos();
+            drawMarks();
           } catch (e) {
-            sweepError = sweepStep + ': ' + String(e).slice(0, 70);
+            // One failing step must not take the rest of the sweep with it.
           }
           // YouTube rebuilds #below as it navigates, which takes the panel
           // with it, so put it back whenever it has gone missing.
@@ -775,10 +769,10 @@ enum PageScript {
               } else if (!panelEl) {
                 renderPanel();
               }
-              sweepStep = 'panel';
+             
             }
           } catch (e) {
-            sweepError = 'panel: ' + String(e).slice(0, 70);
+            // As above.
           }
         }, 300);
       }
@@ -824,6 +818,7 @@ enum PageScript {
       };
 
       refreshHideStyle();
+      stripInitialGlobals();
       scheduleSweep();
     })();
     """

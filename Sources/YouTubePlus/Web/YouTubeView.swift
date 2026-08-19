@@ -92,11 +92,6 @@ struct YouTubeView: NSViewRepresentable {
                     }
                 },
             ]
-            if Self.debugLogging {
-                webView.configuration.userContentController.addUserScript(
-                    WKUserScript(source: "window.__ytplusDebug = true;",
-                                 injectionTime: .atDocumentStart, forMainFrameOnly: true))
-            }
             browser.onOptionsChanged = { [weak self] in self?.pushOptions() }
         }
 
@@ -168,9 +163,6 @@ struct YouTubeView: NSViewRepresentable {
                                   title: body["title"] as? String)
 
             case "state":
-                if Self.debugLogging, let diag = body["diag"] as? [String: Any] {
-                    Self.logDiagnostics(diag)
-                }
                 browser.isPlaying = body["playing"] as? Bool ?? false
                 browser.currentTime = body["time"] as? Double ?? 0
                 browser.isShowingAd = body["ad"] as? Bool ?? false
@@ -204,16 +196,8 @@ struct YouTubeView: NSViewRepresentable {
             }
         }
 
-        /// Set YTPLUS_DEBUG=1 to trace page state on stderr.
-        static let debugLogging = ProcessInfo.processInfo.environment["YTPLUS_DEBUG"] == "1"
-        private static var lastLog = Date.distantPast
 
-        private static func logDiagnostics(_ diag: [String: Any]) {
-            guard Date().timeIntervalSince(lastLog) > 2 else { return }
-            lastLog = Date()
-            let fields = diag.keys.sorted().map { "\($0)=\(diag[$0]!)" }.joined(separator: " ")
-            FileHandle.standardError.write(Data("[page] \(fields)\n".utf8))
-        }
+
 
         // MARK: SponsorBlock
 
@@ -249,10 +233,6 @@ struct YouTubeView: NSViewRepresentable {
                     $0.isPOI || $0.duration >= settings.minimumSegmentDuration
                 }
                 self.browser.segmentCount = usable.count
-                if Self.debugLogging {
-                    FileHandle.standardError.write(
-                        Data("[swift] fetched \(usable.count) segments for \(id)\n".utf8))
-                }
                 self.sendSegments(usable, settings: settings)
             }
         }
