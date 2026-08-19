@@ -81,7 +81,8 @@ enum PageScript {
       var segments = [];
       var options = {
         enabled: true, showNotice: true, noticeSeconds: 5, allowUnskip: true,
-        showBar: true, showPanel: true, blockAds: true, hideShorts: false
+        showBar: true, showPanel: true, blockAds: true, hideShorts: false,
+        quality: 'best'
       };
       installAdStripper();
 
@@ -171,6 +172,7 @@ enum PageScript {
         var id = videoIdFromLocation();
         if (id === currentVideo) { return; }
         currentVideo = id;
+        qualityAppliedFor = null;
         segments = [];
         segmentsLoaded = false;
         suppressed = {};
@@ -465,6 +467,34 @@ enum PageScript {
         });
       }
 
+      // ---- Quality ---------------------------------------------------------
+      //
+      // getAvailableQualityLevels() returns the rungs this video actually has,
+      // highest first. Asking for one it does not offer is ignored, so the
+      // request falls back to the best on offer.
+      //
+      // Note that YouTube's "1080p Premium" (enhanced bitrate) is not a rung a
+      // client can select: it is a paid entitlement the server grants, and it
+      // simply is not present here for accounts without it.
+      var qualityAppliedFor = null;
+
+      function applyQuality() {
+        if (options.quality === 'auto') { return; }
+        if (qualityAppliedFor === currentVideo) { return; }
+
+        var p = player();
+        if (!p || !p.getAvailableQualityLevels || !p.setPlaybackQualityRange) { return; }
+        var levels = p.getAvailableQualityLevels();
+        if (!levels || !levels.length) { return; }
+
+        var target = options.quality === 'best' ? levels[0]
+                   : (levels.indexOf(options.quality) !== -1 ? options.quality : levels[0]);
+        try {
+          p.setPlaybackQualityRange(target, target);
+          qualityAppliedFor = currentVideo;
+        } catch (e) {}
+      }
+
       // ---- Ads -------------------------------------------------------------
       var adSelectors = '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, ' +
                         '.ytp-skip-ad-button, .ytp-ad-overlay-close-button';
@@ -628,6 +658,7 @@ enum PageScript {
             checkVideoChanged(); sweepStep = 'video';
             wireVideo(); sweepStep = 'wire';
             handleAds(); sweepStep = 'ads';
+            applyQuality(); sweepStep = 'quality';
             dismissPromos(); sweepStep = 'promos';
             drawMarks(); sweepStep = 'marks';
           } catch (e) {
@@ -674,7 +705,9 @@ enum PageScript {
           renderPanel();
         },
         setOptions: function (next) {
+          var previousQuality = options.quality;
           for (var key in next) { options[key] = next[key]; }
+          if (options.quality !== previousQuality) { qualityAppliedFor = null; }
           refreshHideStyle();
           var bar = document.querySelector('.ytp-progress-bar');
           if (bar) { bar.removeAttribute('data-ytplus'); }

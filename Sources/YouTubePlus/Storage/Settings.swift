@@ -112,6 +112,30 @@ enum SponsorCategory: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Quality the player is asked to use when a video starts.
+///
+/// These are YouTube's own tokens. "1080p Premium" is deliberately absent: the
+/// enhanced-bitrate stream is a paid Premium entitlement granted server-side, so
+/// it cannot be requested by a client that is not entitled to it.
+enum PreferredQuality: String, Codable, CaseIterable, Identifiable, Sendable {
+    case auto, best, hd2160, hd1440, hd1080, hd720, large, medium
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: return "Auto (let YouTube decide)"
+        case .best: return "Highest available"
+        case .hd2160: return "2160p (4K)"
+        case .hd1440: return "1440p"
+        case .hd1080: return "1080p"
+        case .hd720: return "720p"
+        case .large: return "480p"
+        case .medium: return "360p"
+        }
+    }
+}
+
 // MARK: - Settings
 
 struct AppSettings: Codable, Equatable, Sendable {
@@ -135,6 +159,9 @@ struct AppSettings: Codable, Equatable, Sendable {
 
     // ── Ads ───────────────────────────────────────────────────────────────
     var blockAds: Bool = true
+
+    // ── Playback ──────────────────────────────────────────────────────────
+    var preferredQuality: PreferredQuality = .best
 
     // ── Window and page ───────────────────────────────────────────────────
     var alwaysOnTop: Bool = false
@@ -170,6 +197,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         totalSecondsSkipped = v(.totalSecondsSkipped, d.totalSecondsSkipped)
         totalSegmentsSkipped = v(.totalSegmentsSkipped, d.totalSegmentsSkipped)
         blockAds = v(.blockAds, d.blockAds)
+        preferredQuality = v(.preferredQuality, d.preferredQuality)
         alwaysOnTop = v(.alwaysOnTop, d.alwaysOnTop)
         hideShorts = v(.hideShorts, d.hideShorts)
     }

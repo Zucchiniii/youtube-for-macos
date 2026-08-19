@@ -174,6 +174,16 @@ struct GeneralSettings: View {
                 Toggle("Keep the window above others", isOn: $settings.s.alwaysOnTop)
             }
 
+            Section("Playback") {
+                Picker("Quality", selection: $settings.s.preferredQuality) {
+                    ForEach(PreferredQuality.allCases) { Text($0.label).tag($0) }
+                }
+                Text("Applied when each video starts. Asking for a resolution a video does not have falls back to the best it does have.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("1080p Premium (enhanced bitrate) is a paid YouTube Premium entitlement granted server-side, so it is not listed here — no client can request it without the subscription.")
+                    .font(.caption).foregroundStyle(.tertiary)
+            }
+
             Section("Page") {
                 Toggle("Hide Shorts shelves", isOn: $settings.s.hideShorts)
                 Text("Removes the Shorts rows from feeds and the sidebar entry.")

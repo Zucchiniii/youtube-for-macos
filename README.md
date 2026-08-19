@@ -83,6 +83,16 @@ way — they are the same bytes as the video.
 **No Premium prompts.** The "get YouTube without the ads" dialog and its mealbar
 are dismissed and removed on sight, whether or not ad blocking is on.
 
+**Quality.** YouTube leaves playback on Auto, which often settles below what a
+video actually offers. Settings › General lets you pin a resolution, or ask for
+the highest each video has — applied as it starts, falling back gracefully when
+a video does not carry the rung you asked for.
+
+Note that *1080p Premium* (enhanced bitrate) is not among the options. It is a
+paid YouTube Premium entitlement granted server-side, and is not present in the
+player's quality list for accounts without the subscription — no client can
+request it into existence.
+
 **A native shell.** Real macOS menus, keyboard shortcuts, an always-on-top
 option, and a Shorts-hiding toggle.
 

@@ -292,6 +292,7 @@ struct YouTubeView: NSViewRepresentable {
                 "showPanel": settings.showSegmentPanel,
                 "blockAds": settings.blockAds,
                 "hideShorts": settings.hideShorts,
+                "quality": settings.preferredQuality.rawValue,
             ]
             guard let data = try? JSONSerialization.data(withJSONObject: options),
                   let json = String(data: data, encoding: .utf8),
