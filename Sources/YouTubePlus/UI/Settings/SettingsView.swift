@@ -166,6 +166,7 @@ struct AdSettings: View {
 
 struct GeneralSettings: View {
     @EnvironmentObject private var settings: SettingsStore
+    @ObservedObject private var updates = UpdateChecker.shared
     @State private var message: String?
 
     var body: some View {
@@ -225,6 +226,27 @@ struct GeneralSettings: View {
                         message = "Settings reset to defaults."
                     }
                 }
+            }
+
+            Section("Updates") {
+                LabeledContent("Status") {
+                    if updates.isChecking {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(updates.status ?? "Not checked yet").foregroundStyle(.secondary)
+                    }
+                }
+                HStack {
+                    Button("Check now") { updates.checkAndReport() }
+                        .disabled(updates.isChecking)
+                    if let release = updates.available {
+                        Button("Open release page") {
+                            updates.present(release, userInitiated: true)
+                        }
+                    }
+                }
+                Text("Checked at launch, every six hours while running, when the Mac wakes, and when you switch back to the app — at most once an hour in total.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("About") {

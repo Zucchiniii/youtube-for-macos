@@ -96,6 +96,12 @@ request it into existence.
 **A native shell.** Real macOS menus, keyboard shortcuts, an always-on-top
 option, and a Shorts-hiding toggle.
 
+**Update checks.** The app asks GitHub Releases whether a newer version exists —
+at launch, every six hours while it runs, when the Mac wakes, and when you switch
+back to it, throttled to at most one request an hour. A new version is announced
+once, not on every check, and can be skipped. Releases need a version-shaped tag
+(`v2.1`, `v.2.1`, `2.1` all work) for the comparison to mean anything.
+
 ## Signing in
 
 Sign in on the page itself, exactly as you would in a browser — the Sign in

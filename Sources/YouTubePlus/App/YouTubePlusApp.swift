@@ -5,6 +5,7 @@ struct YouTubePlusApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var settings = SettingsStore.shared
     @StateObject private var browser = BrowserState()
+    @StateObject private var updates = UpdateChecker.shared
 
     var body: some Scene {
         WindowGroup {
@@ -33,7 +34,10 @@ struct YouTubePlusApp: App {
                 .background(WindowConfigurator(alwaysOnTop: settings.s.alwaysOnTop))
                 .frame(minWidth: 900, minHeight: 560)
                 .navigationTitle(browser.pageTitle)
-                .task { await AdBlocker.prepare() }
+                .task {
+                    await AdBlocker.prepare()
+                    updates.start()
+                }
                 .onChange(of: settings.s) { _, _ in browser.settingsChanged() }
         }
         .commands { commands }
@@ -54,6 +58,19 @@ struct YouTubePlusApp: App {
                 if !browser.openClipboardLink() { NSSound.beep() }
             }
             .keyboardShortcut("o", modifiers: [.command])
+        }
+
+        CommandGroup(after: .appInfo) {
+            Button(updates.available == nil
+                   ? "Check for Updates…"
+                   : "Update to \(updates.available!.version)…") {
+                if let release = updates.available {
+                    updates.present(release, userInitiated: true)
+                } else {
+                    updates.checkAndReport()
+                }
+            }
+            .disabled(updates.isChecking)
         }
 
         CommandGroup(after: .toolbar) {
