@@ -305,19 +305,34 @@ enum PageScript {
       }
 
       // ---- Segment list under the video ------------------------------------
+      //
+      // It sits between the description and the comments. insertBefore throws
+      // unless the reference node is a direct child, so each candidate is paired
+      // with its own real parent rather than assuming a fixed nesting depth.
+      function panelAnchor() {
+        var comments = document.querySelector('#comments');
+        if (comments && comments.parentNode) {
+          return { parent: comments.parentNode, before: comments };
+        }
+        var metadata = document.querySelector('ytd-watch-metadata');
+        if (metadata && metadata.parentNode) {
+          return { parent: metadata.parentNode, before: metadata.nextSibling };
+        }
+        var below = document.querySelector('#below');
+        if (below && below.parentNode) {
+          return { parent: below.parentNode, before: below };
+        }
+        return null;
+      }
+
       function renderPanel() {
         var existing = document.querySelector('.ytplus-panel');
         if (existing) { existing.remove(); }
         panelEl = null;
         if (!options.showPanel || !options.enabled || !currentVideo) { return; }
 
-        // #below is rebuilt by YouTube's renderer constantly, which throws any
-        // foreign child away. #primary-inner is the stabler parent, so the panel
-        // goes there, immediately above #below.
-        var inner = document.querySelector('#primary-inner');
-        var below = document.querySelector('#below');
-        var anchor = inner || below;
-        if (!anchor) { return; }
+        var spot = panelAnchor();
+        if (!spot) { return; }
 
         var panel = document.createElement('div');
         panel.className = 'ytplus-panel';
@@ -378,14 +393,8 @@ enum PageScript {
           })(segments[i]);
         }
 
-        // insertBefore throws unless the reference node is a direct child, and
-        // YouTube nests #below at varying depths, so go through its real parent.
         try {
-          if (below && below.parentNode) {
-            below.parentNode.insertBefore(panel, below);
-          } else {
-            anchor.appendChild(panel);
-          }
+          spot.parent.insertBefore(panel, spot.before);
           panelEl = panel;
           panelInserts++;
         } catch (e) {
@@ -613,11 +622,22 @@ enum PageScript {
         }
 
         if (!options.blockAds) { return; }
+
+        // Removing the ad itself leaves its grid cell or shelf behind as a blank
+        // gap, so the wrapper YouTube laid out for it goes too.
+        var wrappers = 'ytd-rich-item-renderer, ytd-rich-section-renderer, ' +
+                       'ytd-item-section-renderer, ytd-compact-video-renderer, ' +
+                       '#player-ads, ytd-merch-shelf-renderer';
         var junk = document.querySelectorAll(
           '.ytp-ad-overlay-slot, .ytp-ad-overlay-container, #player-ads, ' +
           'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ' +
-          'ytd-display-ad-renderer, ytd-companion-slot-renderer');
-        for (var n = 0; n < junk.length; n++) { junk[n].remove(); }
+          'ytd-display-ad-renderer, ytd-companion-slot-renderer, ' +
+          'ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer, ' +
+          'ytd-statement-banner-renderer, ytd-brand-video-shelf-renderer');
+        for (var n = 0; n < junk.length; n++) {
+          var host = junk[n].closest(wrappers);
+          (host || junk[n]).remove();
+        }
       }
 
       // ---- Static CSS for things we always hide ----------------------------
@@ -638,7 +658,18 @@ enum PageScript {
         if (options.blockAds) {
           rules.push('#player-ads, #masthead-ad, ytd-ad-slot-renderer,');
           rules.push('ytd-in-feed-ad-layout-renderer, ytd-display-ad-renderer,');
-          rules.push('ytd-companion-slot-renderer, .ytp-ad-overlay-slot{display:none!important}');
+          rules.push('ytd-companion-slot-renderer, .ytp-ad-overlay-slot,');
+          rules.push('ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer,');
+          rules.push('ytd-statement-banner-renderer{display:none!important}');
+          // Collapse the container an ad was laid out in, not just the ad.
+          rules.push('ytd-rich-item-renderer:has(ytd-ad-slot-renderer),');
+          rules.push('ytd-rich-item-renderer:has(ytd-display-ad-renderer),');
+          rules.push('ytd-rich-item-renderer:has(ytd-in-feed-ad-layout-renderer),');
+          rules.push('ytd-rich-section-renderer:has(ytd-statement-banner-renderer),');
+          rules.push('ytd-item-section-renderer:has(ytd-ad-slot-renderer),');
+          rules.push('ytd-compact-video-renderer:has(ytd-ad-slot-renderer),');
+          rules.push('ytd-rich-item-renderer:empty, ytd-rich-section-renderer:empty');
+          rules.push('{display:none!important}');
         }
         hideStyle.textContent = rules.join(' ');
         if (!hideStyle.parentNode) {
@@ -672,10 +703,8 @@ enum PageScript {
                 // YouTube detached it during a re-render. Putting the existing
                 // node back costs far less than rebuilding the whole list, and
                 // this happens roughly once a second while watching.
-                var below = document.querySelector('#below');
-                if (below && below.parentNode) {
-                  below.parentNode.insertBefore(panelEl, below);
-                }
+                var spot = panelAnchor();
+                if (spot) { spot.parent.insertBefore(panelEl, spot.before); }
               } else if (!panelEl) {
                 renderPanel();
               }
