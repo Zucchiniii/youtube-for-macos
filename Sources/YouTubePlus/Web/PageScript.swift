@@ -41,7 +41,64 @@ enum PageScript {
         }
         if (obj.playerResponse) { stripAdFields(obj.playerResponse); }
         if (obj.response) { stripAdFields(obj.response); }
+
+        // The walk below is only worth doing on feed-shaped payloads. The page
+        // parses JSON constantly, and most of it has no item lists at all.
+        if (obj.contents || obj.continuationContents || obj.onResponseReceivedActions ||
+            obj.onResponseReceivedEndpoints || obj.onResponseReceivedCommands) {
+          pruneAdItems(obj);
+        }
         return obj;
+      }
+
+      // Feed ads have to go before the grid is built, not after.
+      //
+      // Hiding an ad in the DOM leaves the cell YouTube already allotted to it,
+      // and a rich-grid row keeps a fixed number of cells — so a hidden ad shows
+      // as blank space to the right and the row never refills. Dropping the item
+      // from the response means the row is laid out without it in the first place.
+      //
+      // Items are matched on the shape of their renderer key rather than an
+      // exact list, since YouTube renames these regularly.
+      var AD_ITEM_KEY = /(adSlot|displayAd|inFeedAd|promotedSparkles|promotedVideo|compactPromotedVideo|statementBanner|bannerPromo|adsEngagementPanel|adLayout)/i;
+      var LIST_KEYS = ['contents', 'items', 'continuationItems'];
+
+      function itemRendererKeys(item) {
+        var keys = Object.keys(item);
+        var nested = item.richItemRenderer || item.richSectionRenderer;
+        if (nested && nested.content) { keys = keys.concat(Object.keys(nested.content)); }
+        return keys;
+      }
+
+      function isAdItem(item) {
+        if (!item || typeof item !== 'object') { return false; }
+        var keys = itemRendererKeys(item);
+        for (var i = 0; i < keys.length; i++) {
+          if (AD_ITEM_KEY.test(keys[i])) { return true; }
+        }
+        return false;
+      }
+
+      function pruneAdItems(node, depth) {
+        depth = depth || 0;
+        if (!node || typeof node !== 'object' || depth > 8) { return; }
+
+        for (var i = 0; i < LIST_KEYS.length; i++) {
+          var list = node[LIST_KEYS[i]];
+          if (!Array.isArray(list) || !list.length) { continue; }
+          var kept = [];
+          for (var j = 0; j < list.length; j++) {
+            if (!isAdItem(list[j])) { kept.push(list[j]); }
+          }
+          if (kept.length !== list.length) {
+            try { node[LIST_KEYS[i]] = kept; } catch (e) {}
+          }
+        }
+
+        for (var key in node) {
+          var value = node[key];
+          if (value && typeof value === 'object') { pruneAdItems(value, depth + 1); }
+        }
       }
 
       function installAdStripper() {
@@ -62,18 +119,20 @@ enum PageScript {
           };
         }
 
-        // The first video on a cold load arrives as an object literal in the
-        // HTML rather than through JSON.parse.
-        try {
-          var initial;
-          Object.defineProperty(window, 'ytInitialPlayerResponse', {
-            configurable: true,
-            get: function () { return initial; },
-            set: function (value) {
-              initial = options.blockAds ? stripAdFields(value) : value;
-            }
-          });
-        } catch (e) {}
+        // The first video and the first feed on a cold load arrive as object
+        // literals in the HTML rather than through JSON.parse.
+        ['ytInitialPlayerResponse', 'ytInitialData'].forEach(function (name) {
+          try {
+            var initial;
+            Object.defineProperty(window, name, {
+              configurable: true,
+              get: function () { return initial; },
+              set: function (value) {
+                initial = options.blockAds ? stripAdFields(value) : value;
+              }
+            });
+          } catch (e) {}
+        });
       }
 
 
@@ -634,9 +693,17 @@ enum PageScript {
           'ytd-display-ad-renderer, ytd-companion-slot-renderer, ' +
           'ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer, ' +
           'ytd-statement-banner-renderer, ytd-brand-video-shelf-renderer');
+        var removed = 0;
         for (var n = 0; n < junk.length; n++) {
           var host = junk[n].closest(wrappers);
           (host || junk[n]).remove();
+          removed++;
+        }
+
+        // A rich-grid row keeps a fixed cell count, so pulling a cell out leaves
+        // a hole. The grid re-chunks its rows on resize, which closes it.
+        if (removed) {
+          try { window.dispatchEvent(new Event('resize')); } catch (e) {}
         }
       }
 
