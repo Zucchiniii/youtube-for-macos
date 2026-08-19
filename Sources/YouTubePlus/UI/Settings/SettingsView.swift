@@ -250,7 +250,7 @@ struct GeneralSettings: View {
             }
 
             Section("About") {
-                LabeledContent("YouTube Plus", value: "2.0")
+                LabeledContent("YouTube Plus", value: "1.1")
                 Text("YouTube in a native macOS window, with SponsorBlock and ad blocking built in. The interface is YouTube's own, so everything works the way you already know.")
                     .font(.caption).foregroundStyle(.secondary)
             }
