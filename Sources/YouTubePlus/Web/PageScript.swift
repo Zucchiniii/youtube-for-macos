@@ -61,7 +61,9 @@ enum PageScript {
       // Items are matched on the shape of their renderer key rather than an
       // exact list, since YouTube renames these regularly.
       var AD_ITEM_KEY = /(adSlot|displayAd|inFeedAd|promotedSparkles|promotedVideo|compactPromotedVideo|statementBanner|bannerPromo|adsEngagementPanel|adLayout)/i;
-      var LIST_KEYS = ['contents', 'items', 'continuationItems'];
+      // `results` is where the watch page keeps its related list. Without it,
+      // sidebar ads survive the response and have to be handled in the DOM.
+      var LIST_KEYS = ['contents', 'items', 'continuationItems', 'results'];
 
       function itemRendererKeys(item) {
         var keys = Object.keys(item);
@@ -651,6 +653,92 @@ enum PageScript {
         return false;
       }
 
+      // Removing an ad leaves the grid cell or shelf YouTube laid out for it
+      // behind as a blank gap, so the wrapper goes too — but only when the ad is
+      // genuinely all that wrapper holds. `ytd-item-section-renderer` is not a
+      // per-ad wrapper: on a watch page a single one of them contains the whole
+      // related-videos list, and on a search page a whole block of results, so
+      // climbing to it blindly takes the sidebar out along with the ad.
+      var adWrappers = 'ytd-rich-item-renderer, ytd-rich-section-renderer, ' +
+                       'ytd-item-section-renderer, ytd-compact-video-renderer, ' +
+                       '#player-ads, ytd-merch-shelf-renderer';
+      var realContent = 'ytd-video-renderer, ytd-compact-video-renderer, ' +
+                        'ytd-rich-item-renderer, ytd-playlist-renderer, ' +
+                        'ytd-radio-renderer, ytd-channel-renderer, ' +
+                        'ytd-compact-playlist-renderer, ytd-compact-radio-renderer, ' +
+                        'ytd-reel-shelf-renderer, ytd-shelf-renderer, ' +
+                        'ytd-continuation-item-renderer, yt-lockup-view-model';
+
+      function removalTarget(ad) {
+        var host = ad.closest(adWrappers);
+        if (!host || host === ad) { return ad; }
+        var content = host.querySelectorAll(realContent);
+        for (var i = 0; i < content.length; i++) {
+          if (!ad.contains(content[i])) { return ad; }
+        }
+        return host;
+      }
+
+      // YouTube renames its ad components regularly, and a renamed one is
+      // invisible to both the selectors above and the response filter — it just
+      // renders as an ordinary looking card. So feed cells are also matched on
+      // what an ad cannot hide: its click-through goes to an ad server, and it
+      // must carry a "Sponsored" badge.
+      var AD_LINK = /googleadservices\\.com|doubleclick\\.net|\\/pagead\\/|[?&]adurl=/i;
+      var AD_BADGE = 'ytd-ad-badge-view-model, ad-badge-view-model, ' +
+                     '.badge-style-type-ad, ytd-ad-slot-renderer, ' +
+                     'ytd-display-ad-renderer, ytd-in-feed-ad-layout-renderer';
+      var SPONSOR_WORDS = ['sponsored', 'sponsrad', 'sponsoreret', 'sponsoroitu',
+                           'gesponsert', 'gesponsord', 'sponsorisé', 'sponsorizzato',
+                           'patrocinado', 'patrocinada', 'annonse', 'reklama'];
+      var FEED_CELL = 'ytd-rich-item-renderer, ytd-rich-section-renderer, ' +
+                      'ytd-compact-video-renderer, yt-lockup-view-model';
+      // Short standalone labels only. Reading the whole card would delete a video
+      // whose title merely mentions sponsorship.
+      var BADGE_ROW = 'badge-shape, .badge, #byline-container, ' +
+                      '.yt-content-metadata-view-model__metadata-row, ' +
+                      'ytd-video-meta-block, #metadata-line';
+
+      function isSponsoredCell(cell) {
+        if (cell.querySelector(AD_BADGE)) { return true; }
+
+        var links = cell.querySelectorAll('a[href]');
+        for (var i = 0; i < links.length; i++) {
+          if (AD_LINK.test(links[i].getAttribute('href') || '')) { return true; }
+        }
+
+        var rows = cell.querySelectorAll(BADGE_ROW);
+        for (var j = 0; j < rows.length; j++) {
+          var text = (rows[j].textContent || '').trim().toLowerCase();
+          if (!text || text.length > 40) { continue; }
+          for (var k = 0; k < SPONSOR_WORDS.length; k++) {
+            if (text.indexOf(SPONSOR_WORDS[k]) !== -1) { return true; }
+          }
+        }
+        return false;
+      }
+
+      // The grid recycles its cells, so a cell cannot be marked as checked once
+      // and skipped forever — it may be handed different content later. Keying
+      // the mark on the thumbnail link re-checks a cell whenever its content
+      // changes, and ad cells have no video link so they are never skipped.
+      function sweepSponsoredCells() {
+        var cells = document.querySelectorAll(FEED_CELL);
+        var removed = 0;
+        for (var i = 0; i < cells.length; i++) {
+          var cell = cells[i];
+          var link = cell.querySelector('a#thumbnail[href], a.yt-lockup-view-model__content-image[href]');
+          var key = link ? link.getAttribute('href') : '';
+          if (key && cell.__ytplusKey === key) { continue; }
+          cell.__ytplusKey = key;
+          if (isSponsoredCell(cell)) {
+            removalTarget(cell).remove();
+            removed++;
+          }
+        }
+        return removed;
+      }
+
       function dismissPromos() {
         var known = document.querySelectorAll(promoRenderers);
         for (var i = 0; i < known.length; i++) {
@@ -676,11 +764,6 @@ enum PageScript {
 
         if (!options.blockAds) { return; }
 
-        // Removing the ad itself leaves its grid cell or shelf behind as a blank
-        // gap, so the wrapper YouTube laid out for it goes too.
-        var wrappers = 'ytd-rich-item-renderer, ytd-rich-section-renderer, ' +
-                       'ytd-item-section-renderer, ytd-compact-video-renderer, ' +
-                       '#player-ads, ytd-merch-shelf-renderer';
         var junk = document.querySelectorAll(
           '.ytp-ad-overlay-slot, .ytp-ad-overlay-container, #player-ads, ' +
           'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ' +
@@ -689,10 +772,10 @@ enum PageScript {
           'ytd-statement-banner-renderer, ytd-brand-video-shelf-renderer');
         var removed = 0;
         for (var n = 0; n < junk.length; n++) {
-          var host = junk[n].closest(wrappers);
-          (host || junk[n]).remove();
+          removalTarget(junk[n]).remove();
           removed++;
         }
+        removed += sweepSponsoredCells();
 
         // A rich-grid row keeps a fixed cell count, so pulling a cell out leaves
         // a hole. The grid re-chunks its rows on resize, which closes it.
@@ -727,8 +810,8 @@ enum PageScript {
           rules.push('ytd-rich-item-renderer:has(ytd-display-ad-renderer),');
           rules.push('ytd-rich-item-renderer:has(ytd-in-feed-ad-layout-renderer),');
           rules.push('ytd-rich-section-renderer:has(ytd-statement-banner-renderer),');
-          rules.push('ytd-item-section-renderer:has(ytd-ad-slot-renderer),');
-          rules.push('ytd-compact-video-renderer:has(ytd-ad-slot-renderer),');
+          // Nothing here may collapse a container that holds other videos:
+          // the watch sidebar's whole related list is one item-section.
           rules.push('ytd-rich-item-renderer:empty, ytd-rich-section-renderer:empty');
           rules.push('{display:none!important}');
         }
